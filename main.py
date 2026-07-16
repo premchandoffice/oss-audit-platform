@@ -1,64 +1,74 @@
 from pathlib import Path
-import argparse
 
 from scanners.scanoss import ScanOSS
 from scanners.cryptofinder import CryptoFinder
+from scanners.parser import AuditParser
+
+from ai.claude import ClaudeAI
+from ai.report import ReportGenerator
 
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description="OSS Audit Platform"
-    )
+REPORTS_DIR = "reports"
 
-    parser.add_argument(
-        "--repository",
-        default=".",
-        help="Repository path to scan"
-    )
 
-    parser.add_argument(
-        "--reports",
-        default="reports",
-        help="Reports directory"
-    )
-
-    return parser.parse_args()
+def get_repository_name(repository: Path) -> str:
+    return repository.resolve().name
 
 
 def main():
 
-    args = parse_arguments()
+    repository = Path(".")
 
-    repository = Path(args.repository).resolve()
+    repository_name = get_repository_name(repository)
 
-    if not repository.exists():
-        raise FileNotFoundError(
-            f"Repository not found: {repository}"
-        )
-
-    print("=" * 60)
+    print("=" * 70)
     print("OSS Audit Platform")
-    print("=" * 60)
+    print("=" * 70)
 
-    print("\nGenerating SBOM...")
-
+    print("\n[1/5] Generating SBOM...")
     sbom = ScanOSS(
         repository=str(repository),
-        reports_dir=args.reports,
+        reports_dir=REPORTS_DIR,
     ).run()
 
-    print(f"SBOM : {sbom}")
+    print(f"SBOM Generated : {sbom.name}")
 
-    print("\nGenerating CBOM...")
-
+    print("\n[2/5] Generating CBOM...")
     cbom = CryptoFinder(
         repository=str(repository),
-        reports_dir=args.reports,
+        reports_dir=REPORTS_DIR,
     ).run()
 
-    print(f"CBOM : {cbom}")
+    print(f"CBOM Generated : {cbom.name}")
 
-    print("\nScan completed successfully.")
+    print("\n[3/5] Parsing Reports...")
+    parser = AuditParser(REPORTS_DIR)
+
+    summary = parser.parse()
+
+    summary_file = (
+        Path(REPORTS_DIR)
+        / f"{summary['repository']}_summary.json"
+    )
+
+    print(f"Summary Generated : {summary_file.name}")
+
+    print("\n[4/5] Running Claude Analysis...")
+
+    markdown = ClaudeAI().analyze(summary_file)
+
+    print("Claude Analysis Completed")
+
+    print("\n[5/5] Generating Report...")
+
+    report = ReportGenerator().generate(
+        repository=repository_name,
+        report=markdown,
+    )
+
+    print(f"Audit Report : {report.name}")
+
+    print("\nCompleted Successfully")
 
 
 if __name__ == "__main__":
