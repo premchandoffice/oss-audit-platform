@@ -1,0 +1,73 @@
+name: OSS Audit Platform
+
+on:
+  repository_dispatch:
+    types: [audit]
+  schedule:
+    - cron: '0 2 * * 5'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    steps:
+      - name: Resolve target repository
+        id: target
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "repository=${{ github.event.client_payload.repository }}" >> $GITHUB_OUTPUT
+            echo "ref=${{ github.event.client_payload.branch }}" >> $GITHUB_OUTPUT
+            echo "sha=${{ github.event.client_payload.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "repository=<OWNER>/<REPOSITORY>" >> $GITHUB_OUTPUT
+            echo "ref=main" >> $GITHUB_OUTPUT
+            echo "sha=" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.target.outputs.repository }}
+          ref: ${{ steps.target.outputs.ref }}
+          path: source
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install scanoss
+          go install github.com/scanoss/crypto-finder/cmd/crypto-finder@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: Run audit
+        working-directory: source
+        run: python ../main.py
+
+      - name: Step Summary
+        if: always()
+        run: |
+          echo "# OSS Audit Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Repository: ${{ steps.target.outputs.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Branch: ${{ steps.target.outputs.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ steps.target.outputs.sha }}" >> $GITHUB_STEP_SUMMARY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-reports
+          path: source/reports/
+          retention-days: 90
