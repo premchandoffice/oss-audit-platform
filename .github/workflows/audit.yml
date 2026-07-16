@@ -26,7 +26,7 @@ jobs:
             echo "ref=${{ github.event.client_payload.branch }}" >> $GITHUB_OUTPUT
             echo "sha=${{ github.event.client_payload.sha }}" >> $GITHUB_OUTPUT
           else
-            echo "repository=<OWNER>/<REPOSITORY>" >> $GITHUB_OUTPUT
+            echo "repository=premchandoffice/oss-audit-platform" >> $GITHUB_OUTPUT
             echo "ref=main" >> $GITHUB_OUTPUT
             echo "sha=" >> $GITHUB_OUTPUT
           fi
@@ -52,6 +52,12 @@ jobs:
           pip install scanoss
           go install github.com/scanoss/crypto-finder/cmd/crypto-finder@latest
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+      - name: Verify SCANOSS installation
+        run: | 
+          pip show scanoss
+          pip list
+          which scanoss || true
+          which scanoss-py || true
 
       - name: Run audit
         working-directory: source
