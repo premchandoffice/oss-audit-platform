@@ -60,10 +60,10 @@ jobs:
       # Install CryptoFinder
       #################################################################
 
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
+      - name: Install Crypto Finder
+        run: |
+          go install github.com/scanoss/crypto-finder/cmd/crypto-finder@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
       - name: Install CryptoFinder
         run: |
@@ -73,7 +73,7 @@ jobs:
 
       - name: Verify CryptoFinder
         run: |
-          crypto-detector version || true
+          crypto-finder --version
 
       #################################################################
       # Generate CBOM
@@ -81,11 +81,12 @@ jobs:
 
       - name: Generate CBOM
         run: |
-          mkdir -p reports
+          REPO_NAME=$(basename "$GITHUB_REPOSITORY")
+          DATE=$(date +'%Y-%m-%d')
 
-          crypto-detector scan . \
+          crypto-finder scan . \
             --format cyclonedx \
-            --output reports/cbom.json || true
+            --output reports/${DATE}_${REPO_NAME}_cbom.cdx.json
 
       #################################################################
       # AI Report
