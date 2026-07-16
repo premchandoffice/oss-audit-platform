@@ -1,14 +1,14 @@
-import os
+from scanner.scanoss_runner import ScanOSSRunner
+
 
 def main():
-    print("=" * 50)
-    print("OSS Audit Platform")
-    print("=" * 50)
 
-    if os.getenv("GITHUB_ACTIONS"):
-        print("Running inside GitHub Actions")
-    else:
-        print("Running locally")
+    runner = ScanOSSRunner()
+
+    sbom = runner.scan(".")
+
+    print(f"SBOM Location : {sbom}")
+
 
 if __name__ == "__main__":
     main()
