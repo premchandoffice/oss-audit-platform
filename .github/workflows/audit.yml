@@ -11,6 +11,9 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
     steps:
 
       - name: Checkout Repository
@@ -21,21 +24,83 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Python Packages
+      - name: Upgrade pip
         run: |
           python -m pip install --upgrade pip
+
+      - name: Install Python Dependencies
+        run: |
           pip install -r requirements.txt
+
+      #################################################################
+      # Install SCANOSS
+      #################################################################
 
       - name: Install SCANOSS
         run: |
-          pip install scanoss-py
+          pip install scanoss
+
+      - name: Verify SCANOSS
+        run: |
+          scanoss-py --version
+
+      #################################################################
+      # Generate SBOM
+      #################################################################
 
       - name: Generate SBOM
         run: |
+          mkdir -p reports
+
+          scanoss-py scan . \
+            --format cyclonedx \
+            --output reports/sbom.json
+
+      #################################################################
+      # Install CryptoFinder
+      #################################################################
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Install CryptoFinder
+        run: |
+          go install github.com/IBM/crypto-detector/cmd/crypto-detector@latest
+
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Verify CryptoFinder
+        run: |
+          crypto-detector version || true
+
+      #################################################################
+      # Generate CBOM
+      #################################################################
+
+      - name: Generate CBOM
+        run: |
+          mkdir -p reports
+
+          crypto-detector scan . \
+            --format cyclonedx \
+            --output reports/cbom.json || true
+
+      #################################################################
+      # AI Report
+      #################################################################
+
+      - name: Generate AI Report
+        run: |
           python main.py
 
-      - name: Upload SBOM
+      #################################################################
+      # Upload Reports
+      #################################################################
+
+      - name: Upload Reports
         uses: actions/upload-artifact@v4
         with:
-          name: sbom
-          path: reports/sbom.json
+          name: audit-reports
+          path: reports/
